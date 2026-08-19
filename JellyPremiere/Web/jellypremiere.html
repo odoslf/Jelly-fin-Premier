@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <title>JellyPremiere - Administración</title>
+    <style>
+        :root {
+            --jp-primary: #00a4dc;
+            --jp-primary-hover: #0085b3;
+            --jp-bg: #101010;
+            --jp-card-bg: #1c1c1c;
+            --jp-border: #333;
+            --jp-text: #fff;
+            --jp-text-muted: #aaa;
+            --jp-danger: #e50914;
+            --jp-success: #2e7d32;
+            --jp-warning: #f57c00;
+        }
+
+        .jellypremiere-config {
+            font-family: 'Noto Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--jp-text);
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+
+        .jp-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--jp-border);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .jp-header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .jp-badge {
+            background: var(--jp-primary);
+            color: #fff;
+            font-size: 0.8rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .jp-btn {
+            background-color: var(--jp-primary);
+            color: #fff;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: background 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .jp-btn:hover {
+            background-color: var(--jp-primary-hover);
+        }
+
+        .jp-btn-danger {
+            background-color: var(--jp-danger);
+        }
+        .jp-btn-danger:hover {
+            background-color: #b20710;
+        }
+
+        .jp-btn-secondary {
+            background-color: #444;
+        }
+        .jp-btn-secondary:hover {
+            background-color: #555;
+        }
+
+        .jp-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        @media (min-width: 900px) {
+            .jp-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .jp-card {
+            background: var(--jp-card-bg);
+            border: 1px solid var(--jp-border);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .jp-card h2 {
+            margin-top: 0;
+            font-size: 1.3rem;
+            border-bottom: 1px solid var(--jp-border);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .jp-form-group {
+            margin-bottom: 15px;
+        }
+
+        .jp-form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: #ddd;
+            font-size: 0.9rem;
+        }
+
+        .jp-input, .jp-select, .jp-textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--jp-border);
+            background: #121212;
+            color: #fff;
+            box-sizing: border-box;
+            font-size: 0.95rem;
+        }
+
+        .jp-input:focus, .jp-select:focus, .jp-textarea:focus {
+            outline: none;
+            border-color: var(--jp-primary);
+        }
+
+        .jp-textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .jp-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .jp-row .jp-form-group {
+            flex: 1;
+        }
+
+        .jp-announcement-item {
+            background: #141414;
+            border: 1px solid var(--jp-border);
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .jp-announcement-info h3 {
+            margin: 0 0 5px 0;
+            font-size: 1.1rem;
+        }
+
+        .jp-announcement-info p {
+            margin: 0;
+            color: var(--jp-text-muted);
+            font-size: 0.85rem;
+        }
+
+        .jp-type-tag {
+            display: inline-block;
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-right: 6px;
+            font-weight: bold;
+        }
+
+        .jp-type-0 { background: #0288d1; color: #fff; } /* Banner */
+        .jp-type-1 { background: #f57c00; color: #fff; } /* Important */
+        .jp-type-2 { background: #d32f2f; color: #fff; } /* Mandatory */
+
+        .jp-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Modal Styles for Live Preview & Stats */
+        .jp-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 20px;
+        }
+
+        .jp-modal-content {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 25px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            border: 1px solid #333;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        /* Preview Banner Styling */
+        .jp-preview-banner {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            min-height: 200px;
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            align-items: flex-end;
+            padding: 20px;
+            box-sizing: border-box;
+            border: 1px solid var(--jp-border);
+        }
+
+        .jp-preview-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.95) 20%, rgba(0,0,0,0.4) 100%);
+        }
+
+        .jp-preview-body {
+            position: relative;
+            z-index: 2;
+        }
+
+        .jp-preview-body h2 {
+            margin: 0 0 8px 0;
+            font-size: 1.5rem;
+            color: #fff;
+            border: none;
+            padding: 0;
+        }
+
+        .jp-preview-body p {
+            margin: 0 0 12px 0;
+            color: #ddd;
+            font-size: 0.95rem;
+        }
+
+        .jp-stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 0.9rem;
+        }
+
+        .jp-stats-table th, .jp-stats-table td {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 1px solid var(--jp-border);
+        }
+
+        .jp-stats-table th {
+            background: #252525;
+            color: var(--jp-text-muted);
+        }
+
+        .jp-status-ack { color: #4caf50; font-weight: bold; }
+        .jp-status-pending { color: #ff9800; font-weight: bold; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="jellypremiere-config">
+        <div class="jp-header">
+            <h1>
+                JellyPremiere
+                <span class="jp-badge">Servidor</span>
+            </h1>
+            <button class="jp-btn" id="jp-btn-new">+ Crear Anuncio</button>
+        </div>
+
+        <div class="jp-grid">
+            <!-- Left: List of Announcements -->
+            <div class="jp-card">
+                <h2>Anuncios Existentes</h2>
+                <div id="jp-announcements-list">
+                    <p style="color: var(--jp-text-muted);">Cargando anuncios...</p>
+                </div>
+            </div>
+
+            <!-- Right: Form (Create/Edit) -->
+            <div class="jp-card" id="jp-form-card">
+                <h2 id="jp-form-title">Nuevo Anuncio</h2>
+                <form id="jp-announcement-form">
+                    <input type="hidden" id="jp-field-id" />
+
+                    <div class="jp-form-group">
+                        <label for="jp-field-type">Tipo de Anuncio</label>
+                        <select id="jp-field-type" class="jp-select">
+                            <option value="0">Banner Visual (Inicio)</option>
+                            <option value="1">Aviso Importante (Modal Cerrable)</option>
+                            <option value="2">Aviso Obligatorio (Confirmación Requerida)</option>
+                        </select>
+                    </div>
+
+                    <div class="jp-form-group">
+                        <label for="jp-field-library-id">Asociar con Película/Serie de la Biblioteca (Opcional)</label>
+                        <div class="jp-row">
+                            <input type="text" id="jp-field-library-id" class="jp-input" placeholder="ID del elemento de Jellyfin" />
+                            <button type="button" class="jp-btn jp-btn-secondary" id="jp-btn-fetch-item">Cargar Metadatos</button>
+                        </div>
+                    </div>
+
+                    <div class="jp-form-group">
+                        <label for="jp-field-title">Título del Anuncio / Estreno *</label>
+                        <input type="text" id="jp-field-title" class="jp-input" required placeholder="Ej: Alien: Romulus" />
+                    </div>
+
+                    <div class="jp-form-group">
+                        <label for="jp-field-description">Descripción / Texto *</label>
+                        <textarea id="jp-field-description" class="jp-textarea" required placeholder="Ej: Disponible este viernes a las 22:00."></textarea>
+                    </div>
+
+                    <div class="jp-row">
+                        <div class="jp-form-group">
+                            <label for="jp-field-poster">URL Póster (Opcional)</label>
+                            <input type="text" id="jp-field-poster" class="jp-input" placeholder="/Items/{id}/Images/Primary" />
+                        </div>
+                        <div class="jp-form-group">
+                            <label for="jp-field-backdrop">URL Fondo / Backdrop (Opcional)</label>
+                            <input type="text" id="jp-field-backdrop" class="jp-input" placeholder="/Items/{id}/Images/Backdrop/0" />
+                        </div>
+                    </div>
+
+                    <div class="jp-row">
+                        <div class="jp-form-group">
+                            <label for="jp-field-button-text">Texto del Botón (Opcional)</label>
+                            <input type="text" id="jp-field-button-text" class="jp-input" placeholder="Ej: VER INFORMACIÓN" />
+                        </div>
+                        <div class="jp-form-group">
+                            <label for="jp-field-action-url">Enlace / Destino (Opcional)</label>
+                            <input type="text" id="jp-field-action-url" class="jp-input" placeholder="Ej: #/details?id=..." />
+                        </div>
+                    </div>
+
+                    <div class="jp-row">
+                        <div class="jp-form-group">
+                            <label for="jp-field-start">Fecha de Inicio (Programada)</label>
+                            <input type="datetime-local" id="jp-field-start" class="jp-input" />
+                        </div>
+                        <div class="jp-form-group">
+                            <label for="jp-field-end">Fecha de Finalización</label>
+                            <input type="datetime-local" id="jp-field-end" class="jp-input" />
+                        </div>
+                    </div>
+
+                    <div class="jp-form-group" style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="jp-field-enabled" checked style="width:20px; height:20px;" />
+                        <label for="jp-field-enabled" style="margin:0;">Activo inmediatamente / Activado</label>
+                    </div>
+
+                    <div class="jp-actions" style="margin-top: 20px;">
+                        <button type="submit" class="jp-btn">Guardar Anuncio</button>
+                        <button type="button" class="jp-btn jp-btn-secondary" id="jp-btn-preview">Previsualizar</button>
+                        <button type="button" class="jp-btn jp-btn-secondary" id="jp-btn-cancel">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Previsualización / Estadísticas -->
+    <div id="jp-modal" class="jp-modal-overlay hidden">
+        <div class="jp-modal-content" id="jp-modal-body">
+            <!-- Dynamic Content -->
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            let announcements = [];
+
+            function getApiUrl(path) {
+                return ApiClient.getUrl(path);
+            }
+
+            function fetchAnnouncements() {
+                ApiClient.ajax({
+                    type: 'GET',
+                    url: getApiUrl('JellyPremiere/Admin/Announcements'),
+                    dataType: 'json'
+                }).then(data => {
+                    announcements = data || [];
+                    renderAnnouncementsList();
+                }).catch(err => {
+                    console.error('Error fetching announcements:', err);
+                    document.getElementById('jp-announcements-list').innerHTML = '<p style="color:var(--jp-danger);">Error al cargar anuncios.</p>';
+                });
+            }
+
+            function renderAnnouncementsList() {
+                const container = document.getElementById('jp-announcements-list');
+                if (!announcements.length) {
+                    container.innerHTML = '<p style="color: var(--jp-text-muted);">No hay anuncios creados.</p>';
+                    return;
+                }
+
+                const typeNames = ['Banner', 'Aviso Importante', 'Aviso Obligatorio'];
+
+                let html = '';
+                announcements.forEach(a => {
+                    const statusText = a.isEnabled ? '<span style="color:#4caf50;">● Activo</span>' : '<span style="color:#888;">○ Inactivo</span>';
+                    html += `
+                        <div class="jp-announcement-item">
+                            <div class="jp-announcement-info">
+                                <h3>
+                                    <span class="jp-type-tag jp-type-${a.type}">${typeNames[a.type] || 'Banner'}</span>
+                                    ${escapeHtml(a.title)}
+                                </h3>
+                                <p>${escapeHtml(a.description)}</p>
+                                <p style="margin-top:4px; font-size:0.8rem;">Estado: ${statusText}</p>
+                            </div>
+                            <div class="jp-actions">
+                                <button class="jp-btn jp-btn-secondary jp-btn-sm" onclick="window.jpAdmin.edit('${a.id}')">Editar</button>
+                                <button class="jp-btn jp-btn-secondary jp-btn-sm" onclick="window.jpAdmin.stats('${a.id}')">Stats</button>
+                                <button class="jp-btn jp-btn-danger jp-btn-sm" onclick="window.jpAdmin.delete('${a.id}')">Eliminar</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            }
+
+            function escapeHtml(str) {
+                if (!str) return '';
+                return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            }
+
+            function resetForm() {
+                document.getElementById('jp-field-id').value = '';
+                document.getElementById('jp-field-title').value = '';
+                document.getElementById('jp-field-description').value = '';
+                document.getElementById('jp-field-type').value = '0';
+                document.getElementById('jp-field-library-id').value = '';
+                document.getElementById('jp-field-poster').value = '';
+                document.getElementById('jp-field-backdrop').value = '';
+                document.getElementById('jp-field-button-text').value = '';
+                document.getElementById('jp-field-action-url').value = '';
+                document.getElementById('jp-field-start').value = '';
+                document.getElementById('jp-field-end').value = '';
+                document.getElementById('jp-field-enabled').checked = true;
+                document.getElementById('jp-form-title').innerText = 'Nuevo Anuncio';
+            }
+
+            function populateForm(a) {
+                document.getElementById('jp-field-id').value = a.id;
+                document.getElementById('jp-field-title').value = a.title || '';
+                document.getElementById('jp-field-description').value = a.description || '';
+                document.getElementById('jp-field-type').value = a.type ?? 0;
+                document.getElementById('jp-field-library-id').value = a.libraryItemId || '';
+                document.getElementById('jp-field-poster').value = a.mediaMetadata?.posterUrl || '';
+                document.getElementById('jp-field-backdrop').value = a.mediaMetadata?.backdropUrl || '';
+                document.getElementById('jp-field-button-text').value = a.buttonText || '';
+                document.getElementById('jp-field-action-url').value = a.actionUrl || '';
+
+                if (a.startDate) {
+                    document.getElementById('jp-field-start').value = new Date(a.startDate).toISOString().slice(0, 16);
+                } else {
+                    document.getElementById('jp-field-start').value = '';
+                }
+
+                if (a.endDate) {
+                    document.getElementById('jp-field-end').value = new Date(a.endDate).toISOString().slice(0, 16);
+                } else {
+                    document.getElementById('jp-field-end').value = '';
+                }
+
+                document.getElementById('jp-field-enabled').checked = a.isEnabled;
+                document.getElementById('jp-form-title').innerText = 'Editar Anuncio';
+            }
+
+            // Global handlers for buttons in list
+            window.jpAdmin = {
+                edit: function (id) {
+                    const item = announcements.find(a => a.id === id);
+                    if (item) {
+                        populateForm(item);
+                    }
+                },
+                delete: function (id) {
+                    if (confirm('¿Seguro que deseas eliminar este anuncio?')) {
+                        ApiClient.ajax({
+                            type: 'DELETE',
+                            url: getApiUrl('JellyPremiere/Admin/Announcements/' + id)
+                        }).then(() => {
+                            fetchAnnouncements();
+                        }).catch(err => alert('Error eliminando anuncio.'));
+                    }
+                },
+                stats: function (id) {
+                    ApiClient.ajax({
+                        type: 'GET',
+                        url: getApiUrl('JellyPremiere/Admin/Stats/' + id),
+                        dataType: 'json'
+                    }).then(stats => {
+                        showStatsModal(stats);
+                    }).catch(err => alert('Error al cargar estadísticas.'));
+                }
+            };
+
+            function showStatsModal(stats) {
+                const modal = document.getElementById('jp-modal');
+                const modalBody = document.getElementById('jp-modal-body');
+
+                let rows = '';
+                (stats.userStatuses || []).forEach(u => {
+                    const statusClass = u.acknowledged ? 'jp-status-ack' : 'jp-status-pending';
+                    const statusText = u.acknowledged ? 'Confirmado' : 'Pendiente';
+                    const dateText = u.acknowledgedAt ? new Date(u.acknowledgedAt).toLocaleString() : '-';
+                    rows += `
+                        <tr>
+                            <td>${escapeHtml(u.username)}</td>
+                            <td class="${statusClass}">${statusText}</td>
+                            <td>${dateText}</td>
+                        </tr>
+                    `;
+                });
+
+                modalBody.innerHTML = `
+                    <h2 style="margin-top:0;">Estadísticas de Lectura</h2>
+                    <p>Total Usuarios: <strong>${stats.totalUsers}</strong> | Visto: <strong style="color:#4caf50;">${stats.seenCount}</strong> | Pendiente: <strong style="color:#ff9800;">${stats.pendingCount}</strong></p>
+                    <table class="jp-stats-table">
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Estado</th>
+                                <th>Fecha Confirmación</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows || '<tr><td colspan="3">Sin usuarios registradso.</td></tr>'}
+                        </tbody>
+                    </table>
+                    <div style="margin-top:20px; text-align:right;">
+                        <button class="jp-btn jp-btn-secondary" onclick="document.getElementById('jp-modal').classList.add('hidden')">Cerrar</button>
+                    </div>
+                `;
+                modal.classList.remove('hidden');
+            }
+
+            // Event Listeners
+            document.getElementById('jp-btn-new').addEventListener('click', resetForm);
+            document.getElementById('jp-btn-cancel').addEventListener('click', resetForm);
+
+            document.getElementById('jp-btn-fetch-item').addEventListener('click', function () {
+                const itemId = document.getElementById('jp-field-library-id').value.trim();
+                if (!itemId) {
+                    alert('Por favor, ingresa el ID del elemento de Jellyfin.');
+                    return;
+                }
+
+                ApiClient.ajax({
+                    type: 'GET',
+                    url: getApiUrl('JellyPremiere/Library/Item/' + itemId),
+                    dataType: 'json'
+                }).then(meta => {
+                    document.getElementById('jp-field-title').value = meta.title || '';
+                    document.getElementById('jp-field-description').value = meta.overview || '';
+                    if (meta.posterUrl) document.getElementById('jp-field-poster').value = meta.posterUrl;
+                    if (meta.backdropUrl) document.getElementById('jp-field-backdrop').value = meta.backdropUrl;
+                    if (meta.actionUrl) document.getElementById('jp-field-action-url').value = meta.actionUrl;
+                    document.getElementById('jp-field-button-text').value = 'VER INFORMACIÓN';
+                    alert('Metadatos cargados correctamente.');
+                }).catch(err => {
+                    alert('No se pudo encontrar el elemento en la biblioteca.');
+                });
+            });
+
+            document.getElementById('jp-announcement-form').addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                const id = document.getElementById('jp-field-id').value;
+                const type = parseInt(document.getElementById('jp-field-type').value, 10);
+                const title = document.getElementById('jp-field-title').value;
+                const description = document.getElementById('jp-field-description').value;
+                const libraryItemId = document.getElementById('jp-field-library-id').value.trim() || null;
+                const posterUrl = document.getElementById('jp-field-poster').value.trim();
+                const backdropUrl = document.getElementById('jp-field-backdrop').value.trim();
+                const buttonText = document.getElementById('jp-field-button-text').value.trim();
+                const actionUrl = document.getElementById('jp-field-action-url').value.trim();
+                const startDateStr = document.getElementById('jp-field-start').value;
+                const endDateStr = document.getElementById('jp-field-end').value;
+                const isEnabled = document.getElementById('jp-field-enabled').checked;
+
+                const payload = {
+                    title: title,
+                    description: description,
+                    type: type,
+                    libraryItemId: libraryItemId,
+                    buttonText: buttonText || null,
+                    actionUrl: actionUrl || null,
+                    startDate: startDateStr ? new Date(startDateStr).toISOString() : null,
+                    endDate: endDateStr ? new Date(endDateStr).toISOString() : null,
+                    isEnabled: isEnabled,
+                    mediaMetadata: (posterUrl || backdropUrl) ? {
+                        title: title,
+                        overview: description,
+                        posterUrl: posterUrl || null,
+                        backdropUrl: backdropUrl || null
+                    } : null
+                };
+
+                const method = id ? 'PUT' : 'POST';
+                const url = id ? getApiUrl('JellyPremiere/Admin/Announcements/' + id) : getApiUrl('JellyPremiere/Admin/Announcements');
+
+                ApiClient.ajax({
+                    type: method,
+                    url: url,
+                    data: JSON.stringify(payload),
+                    contentType: 'application/json'
+                }).then(() => {
+                    resetForm();
+                    fetchAnnouncements();
+                }).catch(err => alert('Error al guardar el anuncio.'));
+            });
+
+            document.getElementById('jp-btn-preview').addEventListener('click', function () {
+                const title = document.getElementById('jp-field-title').value || 'Título de Ejemplo';
+                const description = document.getElementById('jp-field-description').value || 'Descripción del estreno o anuncio importante.';
+                const backdrop = document.getElementById('jp-field-backdrop').value.trim();
+                const btnText = document.getElementById('jp-field-button-text').value.trim() || 'VER INFORMACIÓN';
+
+                const backdropStyle = backdrop ? `background-image: url('${ApiClient.getUrl(backdrop)}');` : 'background: #252525;';
+
+                const modal = document.getElementById('jp-modal');
+                const modalBody = document.getElementById('jp-modal-body');
+
+                modalBody.innerHTML = `
+                    <h3 style="margin-top:0;">Previsualización Visual</h3>
+                    <div class="jp-preview-banner" style="${backdropStyle}">
+                        <div class="jp-preview-overlay"></div>
+                        <div class="jp-preview-body">
+                            <h2>${escapeHtml(title)}</h2>
+                            <p>${escapeHtml(description)}</p>
+                            <button class="jp-btn">${escapeHtml(btnText)}</button>
+                        </div>
+                    </div>
+                    <div style="margin-top:20px; text-align:right;">
+                        <button class="jp-btn jp-btn-secondary" onclick="document.getElementById('jp-modal').classList.add('hidden')">Cerrar Previsualización</button>
+                    </div>
+                `;
+                modal.classList.remove('hidden');
+            });
+
+            // Initial load
+            fetchAnnouncements();
+        })();
+    </script>
+</body>
+</html>
