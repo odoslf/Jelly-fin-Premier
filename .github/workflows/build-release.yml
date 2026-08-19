@@ -1,0 +1,48 @@
+name: Build and Release JellyPremiere
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore JellyPremiere.sln
+
+      - name: Build Release
+        run: dotnet build JellyPremiere.sln -c Release --no-restore
+
+      - name: Run Tests
+        run: dotnet test JellyPremiere.sln -c Release --no-build
+
+      - name: Build Zip and Manifest Artifacts
+        run: ./build_release.sh
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: "JellyPremiere 1.0.0.0"
+          draft: false
+          prerelease: false
+          files: |
+            dist/JellyPremiere_1.0.0.0.zip
+            dist/JellyPremiere_1.0.0.0.zip.md5
+            dist/JellyPremiere_1.0.0.0.zip.sha256
+            dist/manifest.json
