@@ -26,7 +26,6 @@ SHA256_CHECKSUM=$(sha256sum "./dist/${ZIP_NAME}" | awk '{print $1}')
 echo "${MD5_CHECKSUM}" > "./dist/${ZIP_NAME}.md5"
 echo "${SHA256_CHECKSUM}" > "./dist/${ZIP_NAME}.sha256"
 
-# Jellyfin plugin repository uses MD5 checksum in hex for manifest.json
 DOWNLOAD_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${TAG}/${ZIP_NAME}"
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 

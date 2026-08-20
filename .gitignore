@@ -1,8 +1,11 @@
 [Bb]in/
 [Oo]bj/
+<<<<<<< HEAD
 publish/
 dist/*.zip
 dist/*.md5
 dist/*.sha256
+=======
+>>>>>>> origin/main
 .vs/
 *.user
