@@ -1,4 +1,8 @@
 [Bb]in/
 [Oo]bj/
+publish/
+dist/*.zip
+dist/*.md5
+dist/*.sha256
 .vs/
 *.user
