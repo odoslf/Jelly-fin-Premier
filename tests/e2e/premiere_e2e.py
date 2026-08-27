@@ -68,6 +68,16 @@ def authenticate(username: str, password: str) -> str:
     return token
 
 
+def assert_access_denied(method: str, path: str, token: str) -> int:
+    # Depending on where Jellyfin 10.10.7 rejects a non-admin request, the
+    # framework can return 401 before the controller or 403 from the controller.
+    # Both are valid secure outcomes; success (2xx) must never be accepted.
+    status, _, _ = call(method, path, token=token, expected=(401, 403), raw=True)
+    if status not in (401, 403):
+        raise AssertionError(f"Expected access denial for {method} {path}, got {status}")
+    return status
+
+
 def main() -> None:
     wait_for_server()
     initial_user = call("GET", "/Startup/User", expected=(200,))
@@ -98,10 +108,8 @@ def main() -> None:
     assert pick(created_user, "Name") == USER_NAME
     user_token = authenticate(USER_NAME, USER_PASSWORD)
 
-    denied_status, _, _ = call("GET", "/JellyPremiere/Admin/Announcements", token=user_token, expected=(403,), raw=True)
-    assert denied_status == 403
-    library_denied, _, _ = call("GET", f"/JellyPremiere/Library/Item/{uuid.uuid4()}", token=user_token, expected=(403,), raw=True)
-    assert library_denied == 403
+    admin_denial = assert_access_denied("GET", "/JellyPremiere/Admin/Announcements", user_token)
+    library_denial = assert_access_denied("GET", f"/JellyPremiere/Library/Item/{uuid.uuid4()}", user_token)
 
     announcement = call("POST", "/JellyPremiere/Admin/Announcements", {
         "title": "Aviso E2E",
@@ -133,6 +141,8 @@ def main() -> None:
         "channelId": pick(estreno, "Id"),
         "clientInjection": True,
         "adminPermissions": True,
+        "adminEndpointDenialStatus": admin_denial,
+        "libraryEndpointDenialStatus": library_denial,
         "normalUserAcknowledgment": True,
     }, ensure_ascii=False))
 
