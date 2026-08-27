@@ -31,7 +31,7 @@ public sealed class PremiereChannel : IChannel
         ContentTypes = new List<ChannelMediaContentType>
         {
             ChannelMediaContentType.Movie,
-            ChannelMediaContentType.TVShow
+            ChannelMediaContentType.Episode
         },
         MediaTypes = new List<ChannelMediaType> { ChannelMediaType.Video },
         SupportsContentDownloading = false
@@ -45,16 +45,18 @@ public sealed class PremiereChannel : IChannel
         var announcements = await _repository.GetAllAnnouncementsAsync().ConfigureAwait(false);
         var now = DateTimeOffset.UtcNow;
         var items = announcements
-            .Where(a => a.IsActive && (!a.ExpiresAt.HasValue || a.ExpiresAt.Value > now))
+            .Where(a => a.IsActive(now))
             .OrderByDescending(a => a.CreatedAt)
             .Select(a => new ChannelItemInfo
             {
                 Id = a.Id.ToString("N"),
                 Name = a.Title,
-                Overview = a.Message,
+                Overview = a.Description,
                 Type = ChannelItemType.Media,
                 MediaType = ChannelMediaType.Video,
-                ContentType = ChannelMediaContentType.Movie,
+                ContentType = string.Equals(a.MediaMetadata?.ItemType, "Episode", StringComparison.OrdinalIgnoreCase)
+                    ? ChannelMediaContentType.Episode
+                    : ChannelMediaContentType.Movie,
                 IsLiveStream = false
             })
             .ToList();
