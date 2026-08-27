@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Data.Enums;
 using JellyPremiere.Models;
 using JellyPremiere.Services;
 using MediaBrowser.Controller.Channels;
