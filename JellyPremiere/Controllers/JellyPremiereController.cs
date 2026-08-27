@@ -2,15 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using Jellyfin.Data.Entities;
 using Jellyfin.Data.Enums;
 using JellyPremiere.Models;
 using JellyPremiere.Services;
-using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -26,43 +25,30 @@ namespace JellyPremiere.Controllers
         private readonly IAnnouncementRepository _repository;
         private readonly IUserManager _userManager;
         private readonly ILibraryManager _libraryManager;
+        private readonly IAuthorizationContext _authorizationContext;
         private readonly ILogger<JellyPremiereController> _logger;
 
         public JellyPremiereController(
             IAnnouncementRepository repository,
             IUserManager userManager,
             ILibraryManager libraryManager,
+            IAuthorizationContext authorizationContext,
             ILogger<JellyPremiereController> logger)
         {
             _repository = repository;
             _userManager = userManager;
             _libraryManager = libraryManager;
+            _authorizationContext = authorizationContext;
             _logger = logger;
         }
 
-        private User? GetAuthenticatedUser()
+        private async Task<User?> GetAuthenticatedUserAsync()
         {
-            var userIdClaim = User.FindFirst("UserId")?.Value
-                ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            if (!string.IsNullOrEmpty(userIdClaim) && Guid.TryParse(userIdClaim, out var claimGuid))
-            {
-                var userFromClaim = _userManager.GetUserById(claimGuid);
-                if (userFromClaim != null)
-                {
-                    return userFromClaim;
-                }
-            }
-
-            if (HttpContext.Items.TryGetValue("User", out var itemUser) && itemUser is User u)
-            {
-                return u;
-            }
-
-            return null;
+            var authorization = await _authorizationContext.GetAuthorizationInfo(HttpContext).ConfigureAwait(false);
+            return authorization.IsAuthenticated ? authorization.User : null;
         }
 
-        private bool IsAdmin(User user)
+        private static bool IsAdmin(User user)
         {
             return user.HasPermission(PermissionKind.IsAdministrator);
         }
@@ -107,14 +93,13 @@ namespace JellyPremiere.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<ActionResult<IEnumerable<Announcement>>> GetActiveAnnouncements()
         {
-            var user = GetAuthenticatedUser();
+            var user = await GetAuthenticatedUserAsync().ConfigureAwait(false);
             if (user == null)
             {
                 return Unauthorized();
             }
 
-            var isAdmin = IsAdmin(user);
-            var active = await _repository.GetActiveAnnouncementsForUserAsync(user.Id, isAdmin);
+            var active = await _repository.GetActiveAnnouncementsForUserAsync(user.Id, IsAdmin(user)).ConfigureAwait(false);
             return Ok(active);
         }
 
@@ -128,13 +113,13 @@ namespace JellyPremiere.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> AcknowledgeAnnouncement(Guid id)
         {
-            var user = GetAuthenticatedUser();
+            var user = await GetAuthenticatedUserAsync().ConfigureAwait(false);
             if (user == null)
             {
                 return Unauthorized();
             }
 
-            var announcement = await _repository.GetAnnouncementByIdAsync(id);
+            var announcement = await _repository.GetAnnouncementByIdAsync(id).ConfigureAwait(false);
             if (announcement == null
                 || !announcement.IsActive(DateTimeOffset.UtcNow)
                 || (announcement.TargetUserIds.Count > 0 && !announcement.TargetUserIds.Contains(user.Id)))
@@ -142,7 +127,7 @@ namespace JellyPremiere.Controllers
                 return NotFound();
             }
 
-            await _repository.RecordAcknowledgmentAsync(id, user.Id);
+            await _repository.RecordAcknowledgmentAsync(id, user.Id).ConfigureAwait(false);
             return Ok(new { success = true });
         }
 
@@ -156,7 +141,7 @@ namespace JellyPremiere.Controllers
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<ActionResult<IEnumerable<Announcement>>> GetAllAnnouncements()
         {
-            var user = GetAuthenticatedUser();
+            var user = await GetAuthenticatedUserAsync().ConfigureAwait(false);
             if (user == null)
             {
                 return Unauthorized();
@@ -167,7 +152,7 @@ namespace JellyPremiere.Controllers
                 return Forbid();
             }
 
-            var announcements = await _repository.GetAllAnnouncementsAsync();
+            var announcements = await _repository.GetAllAnnouncementsAsync().ConfigureAwait(false);
             return Ok(announcements);
         }
 
@@ -182,7 +167,7 @@ namespace JellyPremiere.Controllers
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<ActionResult<Announcement>> CreateAnnouncement([FromBody] Announcement announcement)
         {
-            var user = GetAuthenticatedUser();
+            var user = await GetAuthenticatedUserAsync().ConfigureAwait(false);
             if (user == null)
             {
                 return Unauthorized();
@@ -206,7 +191,7 @@ namespace JellyPremiere.Controllers
             announcement.CreatedAt = DateTimeOffset.UtcNow;
             announcement.UpdatedAt = DateTimeOffset.UtcNow;
 
-            await _repository.SaveAnnouncementAsync(announcement);
+            await _repository.SaveAnnouncementAsync(announcement).ConfigureAwait(false);
             return Ok(announcement);
         }
 
@@ -222,7 +207,7 @@ namespace JellyPremiere.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<Announcement>> UpdateAnnouncement(Guid id, [FromBody] Announcement announcement)
         {
-            var user = GetAuthenticatedUser();
+            var user = await GetAuthenticatedUserAsync().ConfigureAwait(false);
             if (user == null)
             {
                 return Unauthorized();
@@ -233,7 +218,7 @@ namespace JellyPremiere.Controllers
                 return Forbid();
             }
 
-            var existing = await _repository.GetAnnouncementByIdAsync(id);
+            var existing = await _repository.GetAnnouncementByIdAsync(id).ConfigureAwait(false);
             if (existing == null)
             {
                 return NotFound();
@@ -243,7 +228,7 @@ namespace JellyPremiere.Controllers
             announcement.CreatedAt = existing.CreatedAt;
             announcement.UpdatedAt = DateTimeOffset.UtcNow;
 
-            await _repository.SaveAnnouncementAsync(announcement);
+            await _repository.SaveAnnouncementAsync(announcement).ConfigureAwait(false);
             return Ok(announcement);
         }
 
@@ -258,7 +243,7 @@ namespace JellyPremiere.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteAnnouncement(Guid id)
         {
-            var user = GetAuthenticatedUser();
+            var user = await GetAuthenticatedUserAsync().ConfigureAwait(false);
             if (user == null)
             {
                 return Unauthorized();
@@ -269,13 +254,13 @@ namespace JellyPremiere.Controllers
                 return Forbid();
             }
 
-            var existing = await _repository.GetAnnouncementByIdAsync(id);
+            var existing = await _repository.GetAnnouncementByIdAsync(id).ConfigureAwait(false);
             if (existing == null)
             {
                 return NotFound();
             }
 
-            await _repository.DeleteAnnouncementAsync(id);
+            await _repository.DeleteAnnouncementAsync(id).ConfigureAwait(false);
             return Ok(new { success = true });
         }
 
@@ -290,7 +275,7 @@ namespace JellyPremiere.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<AnnouncementStats>> GetStats(Guid id)
         {
-            var user = GetAuthenticatedUser();
+            var user = await GetAuthenticatedUserAsync().ConfigureAwait(false);
             if (user == null)
             {
                 return Unauthorized();
@@ -301,14 +286,14 @@ namespace JellyPremiere.Controllers
                 return Forbid();
             }
 
-            var announcement = await _repository.GetAnnouncementByIdAsync(id);
+            var announcement = await _repository.GetAnnouncementByIdAsync(id).ConfigureAwait(false);
             if (announcement == null)
             {
                 return NotFound();
             }
 
             var allUsers = _userManager.Users.ToList();
-            var acks = await _repository.GetAcknowledgmentsForAnnouncementAsync(id);
+            var acks = await _repository.GetAcknowledgmentsForAnnouncementAsync(id).ConfigureAwait(false);
             var ackMap = acks.ToDictionary(a => a.UserId, a => a.AcknowledgedAt);
 
             var userStatuses = new List<UserStatusInfo>();
@@ -350,9 +335,9 @@ namespace JellyPremiere.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult GetLibraryItemMetadata(Guid id)
+        public async Task<IActionResult> GetLibraryItemMetadata(Guid id)
         {
-            var user = GetAuthenticatedUser();
+            var user = await GetAuthenticatedUserAsync().ConfigureAwait(false);
             if (user == null)
             {
                 return Unauthorized();
