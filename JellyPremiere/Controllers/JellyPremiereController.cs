@@ -359,10 +359,10 @@ namespace JellyPremiere.Controllers
                 Title = item.Name,
                 Overview = item.Overview,
                 ItemType = item.GetType().Name,
-                PosterUrl = item.HasImage(MediaBrowser.Model.Entities.ImageType.Primary)
+                PosterUrl = item.HasImage(MediaBrowser.Model.Entities.ImageType.Primary, 0)
                     ? $"/Items/{item.Id}/Images/Primary"
                     : null,
-                BackdropUrl = item.HasImage(MediaBrowser.Model.Entities.ImageType.Backdrop)
+                BackdropUrl = item.HasImage(MediaBrowser.Model.Entities.ImageType.Backdrop, 0)
                     ? $"/Items/{item.Id}/Images/Backdrop/0"
                     : null
             };
