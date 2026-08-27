@@ -1,0 +1,1 @@
+JellyPremiere uses MediaBrowser.Controller.Channels.IChannel for native-client discovery and keeps its existing web resources for Jellyfin Web/WebView clients. No client binary modification or unsupported UI injection is required for the native channel surface.
