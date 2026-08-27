@@ -1,54 +1,164 @@
-name: Build and Release JellyPremiere
+name: Build, validate and release JellyPremiere
 
 on:
   push:
-    branches:
-      - main
-    tags:
-      - 'v*'
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: jellypremiere-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERSION: 1.0.1.0
+  JELLYFIN_URL: http://127.0.0.1:8096
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
+  validate:
+    if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
 
-      - name: Restore dependencies
-        run: dotnet restore JellyPremiere.sln
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
 
-      - name: Build Release
-        run: dotnet build JellyPremiere.sln -c Release --no-restore
+      - name: Validate sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile tests/e2e/premiere_e2e.py
+          grep -q '<Version>1.0.1.0</Version>' JellyPremiere/JellyPremiere.csproj
+          grep -q 'public string DataVersion => "1.0.1.0"' JellyPremiere/Channels/PremiereChannel.cs
 
-      - name: Run Tests
+      - name: Restore
+        run: dotnet restore JellyPremiere.sln --force-evaluate
+
+      - name: Build with warnings as errors
+        run: dotnet build JellyPremiere.sln -c Release --no-restore --warnaserror
+
+      - name: Unit tests
         run: dotnet test JellyPremiere.sln -c Release --no-build
 
-      - name: Build Zip and Manifest Artifacts
-        run: ./build_release.sh
+      - name: Audit dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet list JellyPremiere.sln package --vulnerable --include-transitive | tee vulnerability-audit.txt
+          if grep -Eiq 'has the following vulnerable packages|\b(Critical|High|Moderate|Low)\b' vulnerability-audit.txt; then
+            echo 'Vulnerable dependency detected.' >&2
+            exit 1
+          fi
 
-      - name: Create Release and Upload Assets
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Build installable package
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x build_release.sh
+          ./build_release.sh
+          test -s "dist/JellyPremiere_${VERSION}.zip"
+          test -s dist/manifest.json
+
+      - name: Start official Jellyfin 10.10.7 with packaged plugin
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf e2e-runtime
+          mkdir -p "e2e-runtime/config/plugins/JellyPremiere_${VERSION}" e2e-runtime/cache artifacts
+          unzip -q "dist/JellyPremiere_${VERSION}.zip" -d "e2e-runtime/config/plugins/JellyPremiere_${VERSION}"
+          chmod -R a+rwX e2e-runtime
+          docker pull jellyfin/jellyfin:10.10.7
+          docker run -d --name jellypremiere-e2e \
+            -p 8096:8096 \
+            -v "$PWD/e2e-runtime/config:/config" \
+            -v "$PWD/e2e-runtime/cache:/cache" \
+            jellyfin/jellyfin:10.10.7
+
+      - name: Real Jellyfin 10.10.7 E2E
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/e2e/premiere_e2e.py | tee artifacts/runtime-e2e.json
+          test -s artifacts/runtime-e2e.json
+
+      - name: Capture Jellyfin runtime logs
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          if docker inspect jellypremiere-e2e >/dev/null 2>&1; then
+            docker logs jellypremiere-e2e > artifacts/jellyfin-10.10.7-runtime.log 2>&1 || true
+          else
+            : > artifacts/jellyfin-10.10.7-runtime.log
+          fi
+
+      - name: Assert runtime is clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if docker inspect jellypremiere-e2e >/dev/null 2>&1; then
+            grep -q 'Loaded plugin: JellyPremiere 1.0.1.0' artifacts/jellyfin-10.10.7-runtime.log
+            if grep -E '\[ERR\].*JellyPremiere|JellyPremiere.*\[ERR\]' artifacts/jellyfin-10.10.7-runtime.log; then
+              echo 'JellyPremiere emitted an error in Jellyfin runtime.' >&2
+              exit 1
+            fi
+          fi
+
+      - name: Stop runtime container
+        if: always()
+        run: docker rm -f jellypremiere-e2e || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          tag_name: ${{ github.ref_name }}
-          name: "JellyPremiere ${{ github.ref_name }}"
-          draft: false
-          prerelease: false
-          files: |
-            dist/*.zip
-            dist/*.zip.md5
-            dist/*.zip.sha256
+          name: JellyPremiere-${{ env.VERSION }}-validated
+          retention-days: 14
+          path: |
+            dist/JellyPremiere_${{ env.VERSION }}.zip
+            dist/JellyPremiere_${{ env.VERSION }}.zip.md5
+            dist/JellyPremiere_${{ env.VERSION }}.zip.sha256
             dist/manifest.json
+            artifacts/runtime-e2e.json
+            artifacts/jellyfin-10.10.7-runtime.log
+            vulnerability-audit.txt
+
+      - name: Publish exact validated release and catalog
+        if: ${{ success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test "$GITHUB_SHA" = "$(git rev-parse origin/main)"
+          TAG="v${VERSION}"
+          PACKAGE="dist/JellyPremiere_${VERSION}.zip"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$PACKAGE" "$PACKAGE.md5" "$PACKAGE.sha256" --clobber
+          else
+            gh release create "$TAG" "$PACKAGE" "$PACKAGE.md5" "$PACKAGE.sha256" \
+              --target "$GITHUB_SHA" \
+              --title "JellyPremiere ${VERSION}" \
+              --notes "Versión validada en Jellyfin 10.10.7 real: carga automática Web/WebView, permisos, avisos, confirmaciones y canal nativo Estrenos con reproducción desde fuentes reales de la biblioteca."
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f dist/manifest.json
+          git diff --cached --quiet || git commit -m "release: publish JellyPremiere ${VERSION} catalog [skip ci]"
+          git push origin HEAD:main

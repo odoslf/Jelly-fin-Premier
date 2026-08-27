@@ -42,7 +42,6 @@ namespace JellyPremiere.Controllers
 
         private User? GetAuthenticatedUser()
         {
-            // 1. Check ClaimsPrincipal
             var userIdClaim = User.FindFirst("UserId")?.Value
                 ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
@@ -55,7 +54,6 @@ namespace JellyPremiere.Controllers
                 }
             }
 
-            // 2. Fallback to HttpContext.Items["User"] or HttpContext.User
             if (HttpContext.Items.TryGetValue("User", out var itemUser) && itemUser is User u)
             {
                 return u;
@@ -77,6 +75,10 @@ namespace JellyPremiere.Controllers
         [Produces("application/javascript")]
         public IActionResult GetClientScript()
         {
+            Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+            Response.Headers["Pragma"] = "no-cache";
+            Response.Headers["Expires"] = "0";
+
             var config = JellyPremierePlugin.Instance?.Configuration;
             if (config != null && !config.EnableClientInjection)
             {
@@ -84,7 +86,7 @@ namespace JellyPremiere.Controllers
             }
 
             var assembly = typeof(JellyPremierePlugin).Assembly;
-            var resourceName = "JellyPremiere.Web.jellypremiere.js";
+            const string resourceName = "JellyPremiere.Web.jellypremiere.js";
             using var stream = assembly.GetManifestResourceStream(resourceName);
             if (stream == null)
             {
@@ -117,7 +119,7 @@ namespace JellyPremiere.Controllers
         }
 
         /// <summary>
-        /// Acknowledges an announcement for the current user.
+        /// Acknowledges an active announcement for the current user.
         /// </summary>
         [HttpPost("Acknowledge/{id:guid}")]
         [Authorize]
@@ -133,7 +135,9 @@ namespace JellyPremiere.Controllers
             }
 
             var announcement = await _repository.GetAnnouncementByIdAsync(id);
-            if (announcement == null)
+            if (announcement == null
+                || !announcement.IsActive(DateTimeOffset.UtcNow)
+                || (announcement.TargetUserIds.Count > 0 && !announcement.TargetUserIds.Contains(user.Id)))
             {
                 return NotFound();
             }
@@ -236,6 +240,7 @@ namespace JellyPremiere.Controllers
             }
 
             announcement.Id = id;
+            announcement.CreatedAt = existing.CreatedAt;
             announcement.UpdatedAt = DateTimeOffset.UtcNow;
 
             await _repository.SaveAnnouncementAsync(announcement);
@@ -309,8 +314,7 @@ namespace JellyPremiere.Controllers
             var userStatuses = new List<UserStatusInfo>();
             foreach (var u in allUsers)
             {
-                // Filter by target users if configured
-                if (announcement.TargetUserIds != null && announcement.TargetUserIds.Count > 0 && !announcement.TargetUserIds.Contains(u.Id))
+                if (announcement.TargetUserIds.Count > 0 && !announcement.TargetUserIds.Contains(u.Id))
                 {
                     continue;
                 }
@@ -338,12 +342,13 @@ namespace JellyPremiere.Controllers
         }
 
         /// <summary>
-        /// Fetches metadata for a library item (Movie/Series) by ID (Admin only or authenticated).
+        /// Fetches metadata for a library item (Movie/Series) by ID (Admin only).
         /// </summary>
         [HttpGet("Library/Item/{id:guid}")]
         [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public IActionResult GetLibraryItemMetadata(Guid id)
         {
@@ -351,6 +356,11 @@ namespace JellyPremiere.Controllers
             if (user == null)
             {
                 return Unauthorized();
+            }
+
+            if (!IsAdmin(user))
+            {
+                return Forbid();
             }
 
             var item = _libraryManager.GetItemById(id);

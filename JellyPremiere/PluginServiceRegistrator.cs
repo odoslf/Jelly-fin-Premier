@@ -1,9 +1,11 @@
 using JellyPremiere.Channels;
 using JellyPremiere.Services;
+using JellyPremiere.WebIntegration;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Channels;
 using MediaBrowser.Controller.Plugins;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace JellyPremiere
@@ -20,8 +22,8 @@ namespace JellyPremiere
                 return new JsonAnnouncementRepository(storagePath, logger);
             });
 
-            // IChannel is Jellyfin's server-side extension point understood by native clients.
             serviceCollection.AddSingleton<IChannel, PremiereChannel>();
+            serviceCollection.AddTransient<IStartupFilter, PremiereStartupFilter>();
         }
     }
 }

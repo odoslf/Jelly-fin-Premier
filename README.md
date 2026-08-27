@@ -1,62 +1,57 @@
 # JellyPremiere
 
-**JellyPremiere** es un plugin profesional de gestión y visualización de anuncios, estrenos de la biblioteca y notificaciones para servidores Jellyfin (10.10.7 / .NET 8).
+Plugin de anuncios y estrenos para **Jellyfin 10.10.7 / .NET 8**.
 
----
+## Qué hace
 
-## Características Principales
+- Banners, avisos importantes y avisos obligatorios para usuarios autenticados.
+- Fechas de inicio/fin, destinatarios concretos y confirmación por usuario.
+- Selección de elementos de la biblioteca desde el panel de administración.
+- Carga automática del cliente visual en Jellyfin Web y WebView cuando `EnableClientInjection` está activado.
+- Compatibilidad con **Jellyfin Community**: si ambos plugins están instalados, JellyPremiere se engancha al bootstrap de Community sin competir por `index.html`.
+- Canal nativo **Estrenos** mediante `IChannel` para clientes que muestran Channels.
+- El canal nativo solo publica anuncios vinculados a películas/episodios realmente reproducibles; la reproducción usa `IMediaSourceManager.GetPlaybackMediaSources` del propio Jellyfin. Los avisos de texto nunca se hacen pasar por vídeos.
 
-1. **Tipos de Anuncio:**
-   - **Banner Visual (Inicio):** Banner estilo plataforma de streaming con imágenes de backdrop, degradado oscuro para legibilidad y botón de acción.
-   - **Aviso Importante:** Modal emergente informativo con botón para cerrar.
-   - **Aviso Obligatorio:** Modal emergente que requiere confirmación explícita ("Entendido") y registra individualmente qué usuario ha confirmado el aviso. No vuelve a mostrarse tras la confirmación.
+## Compatibilidad de clientes
 
-2. **Integración con Biblioteca:**
-   - Permite vincular cualquier película o serie existente en Jellyfin.
-   - Extrae automáticamente título, póster, fondo/backdrop y sinopsis, generando anuncios de estreno sin duplicar información.
+- **Jellyfin Web / clientes WebView:** experiencia completa de banners, modales y confirmaciones.
+- **Android / Android TV nativos:** pueden mostrar el canal estándar `Estrenos` si el cliente expone Channels. La ubicación exacta depende del cliente oficial.
+- Un plugin de servidor no puede convertir arbitrariamente una página HTML en una pantalla nativa de Android TV; por eso la parte nativa se implementa con contratos oficiales de Jellyfin.
 
-3. **Programación y Control:**
-   - Publicación inmediata o programada (fecha/hora inicio y fecha/hora fin).
-   - Ocultamiento automático tras caducidad.
-   - Activación / desactivación manual por el administrador.
+## Instalación recomendada
 
-4. **Panel de Administración:**
-   - Sección nativa integrada en la interfaz de Jellyfin.
-   - Panel de control completo (Crear, Editar, Eliminar, Previsualizar, Programar).
-   - Tabla de estadísticas de lectura individualizadas por usuario real de Jellyfin.
-
-5. **Seguridad y Permisos:**
-   - Endpoints REST API protegidos en servidor con autenticación y permisos de usuario.
-   - Identificación de usuario mediante la identidad de Jellyfin (GUID) en lugar de direcciones IP.
-
----
-
-## Instalación en Jellyfin
-
-Añade la URL del repositorio oficial a tu servidor Jellyfin en **Panel de Control -> Plugins -> Repositorios**:
+En **Panel de Control → Plugins → Repositorios**, añade solo el repositorio unificado ODOS3D:
 
 ```text
-https://raw.githubusercontent.com/odoslf/Jelly-fin-Premier/main/dist/manifest.json
+https://raw.githubusercontent.com/odoslf/Repositorio-plugin-Jelly-fin-odos3d.lab/main/manifest.json
 ```
 
-Consulta [INSTALLATION.md](INSTALLATION.md) para instrucciones detalladas.
+Instala **JellyPremiere** y reinicia Jellyfin.
 
----
+## Seguridad
 
-## Compilación y Pruebas (Desarrollo)
+- Administración de anuncios: solo administradores.
+- Listado de usuarios y estadísticas: solo administradores.
+- Estado activo y confirmación: requieren sesión Jellyfin.
+- El script cliente servido por el plugin no contiene tokens; usa la sesión que ya mantiene Jellyfin Web.
 
-### Requisitos
-- .NET 8 SDK
+## Validación
 
-### Compilar y Ejecutar Pruebas Unitarias
+La versión **1.0.1.0** se construye contra Jellyfin 10.10.7. GitHub Actions compila con warnings como errores, ejecuta tests, audita dependencias, genera un ZIP que contiene únicamente `JellyPremiere.dll`, arranca el contenedor oficial `jellyfin/jellyfin:10.10.7` e inspecciona en runtime:
+
+- carga del plugin;
+- inyección automática del cliente Web;
+- API con administrador y usuario normal;
+- permisos de administración;
+- creación/lectura/confirmación de avisos;
+- aparición del canal nativo `Estrenos`;
+- ausencia de errores JellyPremiere en el log.
+
+## Desarrollo
+
 ```bash
 dotnet restore JellyPremiere.sln
 dotnet build JellyPremiere.sln -c Release
 dotnet test JellyPremiere.sln -c Release
-```
-
-### Generar Paquete Instalable ZIP y Manifest
-```bash
 ./build_release.sh
 ```
-El archivo comprimido `JellyPremiere_1.0.0.0.zip` y el `manifest.json` se generarán en la carpeta `dist/`.

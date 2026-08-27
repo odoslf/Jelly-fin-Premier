@@ -1,43 +1,41 @@
-# Guía de Instalación de JellyPremiere
+# Instalación de JellyPremiere 1.0.1.0
 
-Instrucciones detalladas para instalar y configurar **JellyPremiere** en un servidor **Jellyfin 10.10.7**.
+## Requisitos
 
----
+- Jellyfin Server **10.10.7**.
+- Runtime **.NET 8** del propio servidor.
+- Reinicio de Jellyfin después de instalar o actualizar el plugin.
 
-## Método 1: Instalación Mediante Repositorio Manifest.json (Recomendado)
+## Repositorio Jellyfin recomendado
 
-1. En Jellyfin Web, accede a **Panel de Control** -> **Plugins** -> **Repositorios**.
-2. Haz clic en **+** para añadir un nuevo repositorio.
-3. Rellena los datos:
-   - **Nombre del repositorio:** `JellyPremiere Repository`
-   - **URL del repositorio:** `https://raw.githubusercontent.com/odoslf/Jelly-fin-Premier/main/dist/manifest.json`
-4. Guarda los cambios.
-5. Ve a **Panel de Control** -> **Plugins** -> **Catálogo**.
-6. Selecciona **JellyPremiere** e instálalo.
-7. Reinicia el servidor Jellyfin.
+Añade una sola URL en **Panel de Control → Plugins → Repositorios**:
 
----
+```text
+https://raw.githubusercontent.com/odoslf/Repositorio-plugin-Jelly-fin-odos3d.lab/main/manifest.json
+```
 
-## Método 2: Instalación Manual por Carpeta de Plugins
+Ese catálogo unifica JellyPremiere, Community y JellyLiveNow y se sincroniza automáticamente con sus manifests oficiales.
 
-1. Detén el servicio o contenedor de Jellyfin.
-2. Descarga el archivo `JellyPremiere_1.0.0.0.zip` desde la Release `v1.0.0.0` de GitHub:
-   `https://github.com/odoslf/Jelly-fin-Premier/releases/download/v1.0.0.0/JellyPremiere_1.0.0.0.zip`
-3. Extrae el contenido en el directorio de plugins de tu servidor Jellyfin:
-   - **Linux / Docker:** `/var/lib/jellyfin/plugins/JellyPremiere` o `<config_dir>/plugins/JellyPremiere`
-   - **Windows:** `%ProgramData%\Jellyfin\Server\plugins\JellyPremiere`
-4. Inicia el servidor Jellyfin.
-5. Accede a **Panel de Control** -> **Plugins** y verifica que JellyPremiere aparece activo.
+Después instala **JellyPremiere** desde el catálogo y reinicia Jellyfin.
 
----
+## Instalación manual
 
-## Uso del Panel de Administración
+1. Descarga `JellyPremiere_1.0.1.0.zip` desde la release `v1.0.1.0`.
+2. Crea una carpeta `JellyPremiere` dentro del directorio de plugins de Jellyfin.
+3. Extrae `JellyPremiere.dll` dentro de esa carpeta.
+4. Elimina DLL antiguas de JellyPremiere de esa misma carpeta.
+5. Reinicia Jellyfin.
 
-1. Accede a Jellyfin con una cuenta de usuario Administrador.
-2. Abre el **Panel de Control** del servidor.
-3. En la barra lateral izquierda, selecciona la página de **JellyPremiere**.
-4. Desde aquí podrás:
-   - Crear banners de inicio o avisos importantes/obligatorios.
-   - Seleccionar un elemento de la biblioteca e importar sus metadatos automáticamente.
-   - Previsualizar cómo se verá el aviso antes de publicar.
-   - Consultar las estadísticas de confirmación y lectura por usuario real de Jellyfin.
+El ZIP oficial contiene únicamente la DLL del plugin. Las DLL de Jellyfin no se incluyen porque las proporciona el servidor 10.10.7.
+
+## Comprobación
+
+Tras reiniciar:
+
+- Panel de Control → Plugins debe mostrar JellyPremiere 1.0.1.0.
+- Jellyfin Web debe cargar automáticamente `/JellyPremiere/ClientScript.js` si la inyección está activada.
+- Los usuarios normales deben recibir avisos activos destinados a ellos.
+- La administración de anuncios debe seguir restringida a administradores.
+- En clientes que exponen Channels debe aparecer `Estrenos`; solo contendrá películas o episodios vinculados y reproducibles.
+
+Si también está instalado Community, JellyPremiere utiliza su bootstrap Web para que ambos plugins funcionen juntos sin modificar los archivos físicos de Jellyfin Web.
