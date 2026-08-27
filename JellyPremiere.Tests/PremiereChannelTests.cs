@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using JellyPremiere.Channels;
 using JellyPremiere.Models;
 using JellyPremiere.Services;
-using MediaBrowser.Model.Channels;
+using MediaBrowser.Controller.Channels;
 using Xunit;
 
 namespace JellyPremiere.Tests;
