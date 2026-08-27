@@ -5,11 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using JellyPremiere.Services;
 using MediaBrowser.Controller.Channels;
+using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Channels;
-using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
-using MediaBrowser.Model.MediaInfo;
-using MediaBrowser.Model.Querying;
 
 namespace JellyPremiere.Channels;
 
@@ -30,13 +28,20 @@ public sealed class PremiereChannel : IChannel
 
     public InternalChannelFeatures GetChannelFeatures() => new()
     {
-        ContentTypes = new List<ChannelMediaContentType> { ChannelMediaContentType.Movie, ChannelMediaContentType.TVShow },
+        ContentTypes = new List<ChannelMediaContentType>
+        {
+            ChannelMediaContentType.Movie,
+            ChannelMediaContentType.TVShow
+        },
         MediaTypes = new List<ChannelMediaType> { ChannelMediaType.Video },
         SupportsContentDownloading = false
     };
 
+    public bool IsEnabledFor(string userId) => true;
+
     public async Task<ChannelItemResult> GetChannelItems(InternalChannelItemQuery query, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var announcements = await _repository.GetAllAnnouncementsAsync().ConfigureAwait(false);
         var now = DateTimeOffset.UtcNow;
         var items = announcements
@@ -61,6 +66,11 @@ public sealed class PremiereChannel : IChannel
         };
     }
 
-    public Task<IEnumerable<MediaSourceInfo>> GetChannelItemMediaInfo(string id, CancellationToken cancellationToken)
-        => Task.FromResult<IEnumerable<MediaSourceInfo>>(Array.Empty<MediaSourceInfo>());
+    public Task<DynamicImageResponse> GetChannelImage(ImageType type, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(new DynamicImageResponse { HasImage = false });
+    }
+
+    public IEnumerable<ImageType> GetSupportedChannelImages() => Array.Empty<ImageType>();
 }
