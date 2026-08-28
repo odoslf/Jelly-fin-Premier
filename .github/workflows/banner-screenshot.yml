@@ -1,3 +1,4 @@
+# Real visual verification of the published plugin in Jellyfin 10.10.7
 name: Capture real JellyPremiere banner screenshot
 
 on:
