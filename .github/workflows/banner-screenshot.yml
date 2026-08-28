@@ -1,0 +1,158 @@
+name: Capture real JellyPremiere banner screenshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/banner-screenshot.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  JELLYFIN_URL: http://127.0.0.1:8096
+  VERSION: 1.0.1.0
+
+jobs:
+  screenshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Download validated JellyPremiere release
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p runtime/config/plugins/JellyPremiere_${VERSION} runtime/cache artifacts
+          curl -fsSL --retry 5 \
+            "https://github.com/odoslf/Jelly-fin-Premier/releases/download/v${VERSION}/JellyPremiere_${VERSION}.zip" \
+            -o plugin.zip
+          unzip -q plugin.zip -d "runtime/config/plugins/JellyPremiere_${VERSION}"
+          chmod -R a+rwX runtime
+
+      - name: Start official Jellyfin 10.10.7
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull jellyfin/jellyfin:10.10.7
+          docker run -d --name jellypremiere-banner \
+            -p 8096:8096 \
+            -v "$PWD/runtime/config:/config" \
+            -v "$PWD/runtime/cache:/cache" \
+            jellyfin/jellyfin:10.10.7
+
+      - name: Configure Jellyfin and create real banner announcement
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, time, urllib.request, urllib.error
+          BASE='http://127.0.0.1:8096'
+          AUTH='MediaBrowser Client="JellyPremiere%20Visual", DeviceId="jp-visual", Device="GitHub%20Actions", Version="1.0.1.0"'
+          def call(method,path,body=None,token=None,expected=(200,204)):
+              data=None
+              headers={'Accept':'application/json','Authorization':AUTH + (f', Token={token}' if token else '')}
+              if body is not None:
+                  data=json.dumps(body).encode(); headers['Content-Type']='application/json'
+              req=urllib.request.Request(BASE+path,data=data,headers=headers,method=method)
+              try:
+                  with urllib.request.urlopen(req,timeout=30) as r: raw=r.read(); status=r.status
+              except urllib.error.HTTPError as e:
+                  raw=e.read(); status=e.code
+              if status not in expected: raise RuntimeError((method,path,status,raw[:500]))
+              return json.loads(raw.decode()) if raw else None
+          deadline=time.time()+180
+          while time.time()<deadline:
+              try:
+                  call('GET','/System/Info/Public',expected=(200,)); break
+              except Exception: time.sleep(2)
+          else: raise RuntimeError('Jellyfin no arrancó')
+          call('POST','/Startup/Configuration',{'UICulture':'es-ES','MetadataCountryCode':'ES','PreferredMetadataLanguage':'es'})
+          call('POST','/Startup/User',{'Name':'banner-admin','Password':'banner-admin-password'})
+          call('POST','/Startup/RemoteAccess',{'EnableRemoteAccess':False,'EnableAutomaticPortMapping':False})
+          call('POST','/Startup/Complete')
+          auth=call('POST','/Users/AuthenticateByName',{'Username':'banner-admin','Pw':'banner-admin-password'},expected=(200,))
+          token=auth.get('AccessToken') or auth.get('accessToken')
+          call('POST','/Users/New',{'Name':'banner-user','Password':'banner-user-password'},token=token,expected=(200,))
+          announcement=call('POST','/JellyPremiere/Admin/Announcements',{
+              'title':'Nuevo estreno disponible',
+              'description':'Ya puedes disfrutar del nuevo contenido destacado en el servidor. Pulsa el botón para abrir su ficha directamente en Jellyfin.',
+              'type':0,
+              'isEnabled':True,
+              'buttonText':'VER INFORMACIÓN',
+              'targetUserIds':[]
+          },token=token,expected=(200,201))
+          print(json.dumps(announcement,ensure_ascii=False))
+          PY
+
+      - name: Install Playwright Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Capture banner inside real Jellyfin Web
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'JS'
+          import { chromium } from 'playwright';
+          const base='http://127.0.0.1:8096';
+          const browser=await chromium.launch({headless:true});
+          try {
+            const context=await browser.newContext({viewport:{width:1440,height:900}, deviceScaleFactor:1});
+            const page=await context.newPage();
+            await page.goto(`${base}/web/index.html#!/login.html`,{waitUntil:'domcontentloaded'});
+            await page.locator('#loginPage').waitFor({state:'visible',timeout:30000});
+            await page.waitForFunction(()=>{
+              const manual=document.querySelector('.manualLoginForm');
+              const button=document.querySelector('.btnManual');
+              return (manual && !manual.classList.contains('hide')) || (button && !button.classList.contains('hide'));
+            },null,{timeout:30000});
+            if (!(await page.locator('.manualLoginForm').isVisible())) await page.locator('.btnManual').click();
+            await page.locator('#txtManualName').fill('banner-user');
+            await page.locator('#txtManualPassword').fill('banner-user-password');
+            await page.locator('.manualLoginForm button[type="submit"]').click();
+            await page.waitForFunction(()=>typeof window.ApiClient?.accessToken==='function' && Boolean(window.ApiClient.accessToken()),null,{timeout:30000});
+            await page.locator('.mainDrawerButton:not(.hide)').first().waitFor({state:'visible',timeout:30000});
+            await page.waitForFunction(()=>Boolean(document.querySelector('.jp-banner-card')),null,{timeout:30000});
+            await page.locator('.jp-banner-card').scrollIntoViewIfNeeded();
+            await page.screenshot({path:'artifacts/jellypremiere-banner-real.png',fullPage:false});
+            const box=await page.locator('.jp-banner-card').boundingBox();
+            if (!box) throw new Error('Banner not visible');
+            await page.locator('.jp-banner-card').screenshot({path:'artifacts/jellypremiere-banner-only.png'});
+            console.log(JSON.stringify({status:'passed',bannerVisible:true,box}));
+            await context.close();
+          } finally { await browser.close(); }
+          JS
+          test -s artifacts/jellypremiere-banner-real.png
+          test -s artifacts/jellypremiere-banner-only.png
+
+      - name: Capture runtime logs
+        if: always()
+        shell: bash
+        run: |
+          docker logs jellypremiere-banner > artifacts/jellyfin-runtime.log 2>&1 || true
+
+      - name: Stop runtime
+        if: always()
+        run: docker rm -f jellypremiere-banner || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: JellyPremiere-banner-real-Jellyfin-10.10.7
+          retention-days: 14
+          path: |
+            artifacts/jellypremiere-banner-real.png
+            artifacts/jellypremiere-banner-only.png
+            artifacts/jellyfin-runtime.log
